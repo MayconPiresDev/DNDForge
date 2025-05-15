@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useUser } from '@/hooks/use-user'
+import { useRouter } from 'next/navigation'
 
 type Table = {
     id: string
     name: string
     description: string
+    master_id: string
     created_at: string
 }
 
@@ -19,6 +21,7 @@ export default function TablesPage() {
     const [tables, setTables] = useState<Table[]>([])
     const [form, setForm] = useState({ name: '', description: '' })
     const [loading, setLoading] = useState(false)
+    const router = useRouter()
 
     useEffect(() => {
         if (!user) return
@@ -38,13 +41,17 @@ export default function TablesPage() {
 
     const handleCreate = async () => {
         if (!form.name.trim()) return
-
         setLoading(true)
-        const { data, error } = await supabase.from('tables').insert({
-            name: form.name,
-            description: form.description,
-            master_id: user?.id
-        }).select().single()
+
+        const { data, error } = await supabase
+            .from('tables')
+            .insert({
+                name: form.name,
+                description: form.description,
+                master_id: user?.id
+            })
+            .select()
+            .single()
 
         if (!error && data) {
             setTables(prev => [data, ...prev])
@@ -55,16 +62,6 @@ export default function TablesPage() {
 
         setLoading(false)
     }
-
-    const handleDelete = async (id: string) => {
-        const confirm = window.confirm('Deseja deletar esta mesa?')
-        if (!confirm) return
-
-        const { error } = await supabase.from('tables').delete().eq('id', id)
-        if (!error) setTables(prev => prev.filter(t => t.id !== id))
-    }
-
-    if (authLoading || !user) return <p className="p-4">Carregando...</p>
 
     return (
         <div className="p-6 space-y-6">
@@ -94,11 +91,56 @@ export default function TablesPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {tables.map((table) => (
-                    <div key={table.id} className="border rounded-lg p-4 space-y-2 bg-card">
+                    <div
+                        key={table.id}
+                        onClick={() => router.push(`/tables/${table.id}`)}
+                        className="border rounded-lg p-4 space-y-2 bg-card cursor-pointer hover:ring-2 ring-ring transition"
+                    >
                         <h2 className="text-lg font-semibold">{table.name}</h2>
-                        <p className="text-sm text-muted-foreground">{table.description || 'Sem descrição'}</p>
-                        <p className="text-xs text-muted-foreground">Criada em: {new Date(table.created_at).toLocaleDateString('pt-BR')}</p>
-                        <Button variant="destructive" size="sm" onClick={() => handleDelete(table.id)}>
+                        <p className="text-sm text-muted-foreground">
+                            {table.description || 'Sem descrição'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            Criada em: {new Date(table.created_at).toLocaleDateString('pt-BR')}
+                        </p>
+
+                        <p className="text-xs text-muted-foreground">
+                            Jogadores: — | Fichas: —
+                        </p>
+
+                        {table.master_id === user?.id && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    navigator.clipboard.writeText(`${location.origin}/join/${table.id}`)
+                                    alert('Link de convite copiado!')
+                                }}
+                            >
+                                Copiar Link de Convite
+                            </Button>
+                        )}
+
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                const confirmDelete = window.confirm('Deseja excluir esta mesa?')
+                                if (!confirmDelete) return
+
+                                supabase
+                                    .from('tables')
+                                    .delete()
+                                    .eq('id', table.id)
+                                    .then(({ error }) => {
+                                        if (!error) {
+                                            setTables(prev => prev.filter(t => t.id !== table.id))
+                                        }
+                                    })
+                            }}
+                        >
                             Deletar
                         </Button>
                     </div>

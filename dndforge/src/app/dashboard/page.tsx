@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/hooks/use-user'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
 
 type Character = {
     id: string
     name: string
     class: string
     race: string
+    avatar_url?: string
+    is_public: boolean
     created_at: string
 }
 
@@ -30,7 +33,7 @@ export default function DashboardPage() {
             setLoading(true)
             const { data, error } = await supabase
                 .from('characters')
-                .select('id, name, class, race, avatar_url, created_at')
+                .select('id, name, class, race, avatar_url, is_public, created_at')
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false })
 
@@ -107,6 +110,38 @@ export default function DashboardPage() {
                                     Deletar
                                 </button>
                             </div>
+
+                            {/* Visibilidade pública */}
+                            {char.is_public && (
+                                <div className="text-xs bg-muted p-2 rounded mt-2 select-all overflow-x-auto">
+                                    Link público: {`${location.origin}/public/characters/${char.id}`}
+                                </div>
+                            )}
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="mt-2"
+                                onClick={async () => {
+                                    const { error } = await supabase
+                                        .from('characters')
+                                        .update({ is_public: !char.is_public })
+                                        .eq('id', char.id)
+
+                                    if (error) {
+                                        alert('Erro ao atualizar visibilidade')
+                                        return
+                                    }
+
+                                    setCharacters((prev) =>
+                                        prev.map((c) =>
+                                            c.id === char.id ? { ...c, is_public: !char.is_public } : c
+                                        )
+                                    )
+                                }}
+                            >
+                                {char.is_public ? '🔒 Tornar Privada' : '🔓 Tornar Pública'}
+                            </Button>
                         </div>
                     ))}
                 </div>

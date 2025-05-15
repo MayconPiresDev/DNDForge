@@ -13,6 +13,15 @@ import {
     SelectContent,
     SelectItem
 } from '@/components/ui/select'
+import {
+    Dialog,
+    DialogTrigger,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog'
+import { toast } from 'sonner'
 
 type Character = {
     id: string
@@ -103,13 +112,13 @@ export default function TableDetailsPage() {
         if (!error) {
             const char = myCharacters.find(c => c.id === selectedChar)
             if (char) setLinkedCharacters((prev) => [...prev, char])
+            toast.success('Ficha vinculada à mesa.')
+        } else {
+            toast.error('Erro ao vincular ficha.')
         }
     }
 
     const handleUnlink = async (charId: string) => {
-        const confirm = window.confirm('Remover personagem da mesa?')
-        if (!confirm) return
-
         const { error } = await supabase
             .from('character_table_links')
             .delete()
@@ -118,14 +127,13 @@ export default function TableDetailsPage() {
 
         if (!error) {
             setLinkedCharacters((prev) => prev.filter(c => c.id !== charId))
+            toast.success('Ficha desvinculada.')
+        } else {
+            toast.error('Erro ao desvincular ficha.')
         }
     }
 
     const handleRemovePlayer = async (playerId: string) => {
-        const confirm = window.confirm('Deseja remover este jogador da mesa? As fichas dele também serão desvinculadas.')
-
-        if (!confirm) return
-
         const { error } = await supabase
             .from('table_players')
             .delete()
@@ -133,12 +141,13 @@ export default function TableDetailsPage() {
             .eq('player_id', playerId)
 
         if (error) {
-            alert('Erro ao remover jogador')
+            toast.error('Erro ao remover jogador.')
             return
         }
 
-        // Remove fichas vinculadas à mesa por esse jogador
-        const fichasDoJogador = linkedCharacters.filter(c => c.user_id === playerId).map(c => c.id)
+        const fichasDoJogador = linkedCharacters
+            .filter(c => c.user_id === playerId)
+            .map(c => c.id)
 
         if (fichasDoJogador.length > 0) {
             await supabase
@@ -150,6 +159,7 @@ export default function TableDetailsPage() {
 
         setPlayers(prev => prev.filter(p => p.player_id !== playerId))
         setLinkedCharacters(prev => prev.filter(c => c.user_id !== playerId))
+        toast.success('Jogador removido da mesa.')
     }
 
     if (!table) return <p className="p-4">Carregando mesa...</p>
@@ -200,15 +210,33 @@ export default function TableDetailsPage() {
                         <div key={player.player_id} className="border rounded-lg p-4 space-y-2 bg-muted/30 mt-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="font-semibold text-sm text-foreground">👤 {player.email}</h3>
+
                                 {table.master_id === user?.id && player.player_id !== user?.id && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-xs text-red-600 hover:underline"
-                                        onClick={() => handleRemovePlayer(player.player_id)}
-                                    >
-                                        Remover jogador
-                                    </Button>
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-xs text-red-600 hover:underline"
+                                            >
+                                                Remover jogador
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Remover jogador {player.email} da mesa?</DialogTitle>
+                                            </DialogHeader>
+                                            <DialogFooter>
+                                                <Button variant="outline">Cancelar</Button>
+                                                <Button
+                                                    variant="destructive"
+                                                    onClick={() => handleRemovePlayer(player.player_id)}
+                                                >
+                                                    Confirmar
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
                                 )}
                             </div>
 

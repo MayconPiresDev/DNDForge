@@ -5,6 +5,15 @@ import { supabase } from '@/lib/supabase'
 import { useUser } from '@/hooks/use-user'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import {
+    Dialog,
+    DialogTrigger,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter
+} from '@/components/ui/dialog'
+import { toast } from 'sonner'
 
 type Character = {
     id: string
@@ -20,6 +29,7 @@ export default function DashboardPage() {
     const { user, loading: authLoading } = useUser()
     const [characters, setCharacters] = useState<Character[]>([])
     const [loading, setLoading] = useState(true)
+    const [deletingId, setDeletingId] = useState<string | null>(null)
     const router = useRouter()
 
     useEffect(() => {
@@ -38,7 +48,7 @@ export default function DashboardPage() {
                 .order('created_at', { ascending: false })
 
             if (error) {
-                console.error(error)
+                toast.error('Erro ao carregar fichas.')
             } else {
                 setCharacters(data || [])
             }
@@ -97,18 +107,41 @@ export default function DashboardPage() {
                                     Editar
                                 </button>
 
-                                <button
-                                    className="text-sm text-red-600 hover:underline"
-                                    onClick={async () => {
-                                        const confirm = window.confirm(`Deseja mesmo deletar "${char.name}"?`)
-                                        if (!confirm) return
-                                        const { error } = await supabase.from('characters').delete().eq('id', char.id)
-                                        if (!error) setCharacters(prev => prev.filter(c => c.id !== char.id))
-                                        else alert('Erro ao deletar')
-                                    }}
-                                >
-                                    Deletar
-                                </button>
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <button
+                                            className="text-sm text-red-600 hover:underline"
+                                            onClick={() => setDeletingId(char.id)}
+                                        >
+                                            Deletar
+                                        </button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Deseja deletar a ficha "{char.name}"?</DialogTitle>
+                                        </DialogHeader>
+                                        <DialogFooter>
+                                            <Button variant="outline" onClick={() => setDeletingId(null)}>
+                                                Cancelar
+                                            </Button>
+                                            <Button
+                                                variant="destructive"
+                                                onClick={async () => {
+                                                    const { error } = await supabase.from('characters').delete().eq('id', char.id)
+                                                    if (!error) {
+                                                        setCharacters((prev) => prev.filter((c) => c.id !== char.id))
+                                                        toast.success('Ficha deletada com sucesso.')
+                                                    } else {
+                                                        toast.error('Erro ao deletar ficha.')
+                                                    }
+                                                    setDeletingId(null)
+                                                }}
+                                            >
+                                                Deletar
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                             </div>
 
                             {/* Visibilidade pública */}
@@ -129,7 +162,7 @@ export default function DashboardPage() {
                                         .eq('id', char.id)
 
                                     if (error) {
-                                        alert('Erro ao atualizar visibilidade')
+                                        toast.error('Erro ao atualizar visibilidade.')
                                         return
                                     }
 
@@ -137,6 +170,10 @@ export default function DashboardPage() {
                                         prev.map((c) =>
                                             c.id === char.id ? { ...c, is_public: !char.is_public } : c
                                         )
+                                    )
+
+                                    toast.success(
+                                        char.is_public ? 'Ficha agora é privada.' : 'Ficha agora é pública.'
                                     )
                                 }}
                             >

@@ -7,6 +7,15 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useUser } from '@/hooks/use-user'
 import { useRouter } from 'next/navigation'
+import {
+    Dialog,
+    DialogTrigger,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog'
+import { toast } from 'sonner'
 
 type Table = {
     id: string
@@ -17,10 +26,11 @@ type Table = {
 }
 
 export default function TablesPage() {
-    const { user, loading: authLoading } = useUser()
+    const { user } = useUser()
     const [tables, setTables] = useState<Table[]>([])
     const [form, setForm] = useState({ name: '', description: '' })
     const [loading, setLoading] = useState(false)
+    const [selectedToDelete, setSelectedToDelete] = useState<string | null>(null)
     const router = useRouter()
 
     useEffect(() => {
@@ -56,11 +66,23 @@ export default function TablesPage() {
         if (!error && data) {
             setTables(prev => [data, ...prev])
             setForm({ name: '', description: '' })
+            toast.success('Mesa criada com sucesso!')
         } else {
-            alert('Erro ao criar mesa')
+            toast.error('Erro ao criar mesa.')
         }
 
         setLoading(false)
+    }
+
+    const handleDelete = async (tableId: string) => {
+        const { error } = await supabase.from('tables').delete().eq('id', tableId)
+        if (!error) {
+            setTables(prev => prev.filter(t => t.id !== tableId))
+            toast.success('Mesa deletada.')
+        } else {
+            toast.error('Erro ao deletar mesa.')
+        }
+        setSelectedToDelete(null)
     }
 
     return (
@@ -109,40 +131,51 @@ export default function TablesPage() {
                         </p>
 
                         {table.master_id === user?.id && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    navigator.clipboard.writeText(`${location.origin}/join/${table.id}`)
-                                    alert('Link de convite copiado!')
-                                }}
-                            >
-                                Copiar Link de Convite
-                            </Button>
+                            <>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        navigator.clipboard.writeText(`${location.origin}/join/${table.id}`)
+                                        toast.success('Link de convite copiado!')
+                                    }}
+                                >
+                                    Copiar Link de Convite
+                                </Button>
+
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setSelectedToDelete(table.id)
+                                            }}
+                                        >
+                                            Deletar
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Deseja excluir a mesa "{table.name}"?</DialogTitle>
+                                        </DialogHeader>
+                                        <DialogFooter>
+                                            <Button variant="outline" onClick={() => setSelectedToDelete(null)}>
+                                                Cancelar
+                                            </Button>
+                                            <Button
+                                                variant="destructive"
+                                                onClick={() => handleDelete(table.id)}
+                                            >
+                                                Confirmar
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </>
                         )}
-
-                        <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                const confirmDelete = window.confirm('Deseja excluir esta mesa?')
-                                if (!confirmDelete) return
-
-                                supabase
-                                    .from('tables')
-                                    .delete()
-                                    .eq('id', table.id)
-                                    .then(({ error }) => {
-                                        if (!error) {
-                                            setTables(prev => prev.filter(t => t.id !== table.id))
-                                        }
-                                    })
-                            }}
-                        >
-                            Deletar
-                        </Button>
                     </div>
                 ))}
             </div>

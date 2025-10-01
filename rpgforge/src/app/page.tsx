@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -22,16 +23,18 @@ import {
 } from "@/components/ui/command"
 import { ArrowRight, Dice6, CalendarDays, Users, Shield, Swords } from "lucide-react"
 import { motion, animate, useMotionValue, useTransform, useReducedMotion } from "framer-motion"
+import { roll } from "@/lib/roll"
+import { toast } from "sonner"
 
 function AnimatedDice() {
   const prefersReducedMotion = useReducedMotion()
-  const [roll, setRoll] = useState<number | null>(null)
+  const [rollVal, setRollVal] = useState<number | null>(null)
   const animProps = prefersReducedMotion
     ? { rotate: 0, y: 0, scale: 1 }
     : {
-        rotate: roll ? [0, 360] : 10,
-        y: roll ? [0, -4, 0] : [-2, 2, -2],
-        scale: roll ? [1, 1.08, 1] : [1, 1.02, 1],
+        rotate: rollVal ? [0, 360] : 10,
+        y: rollVal ? [0, -4, 0] : [-2, 2, -2],
+        scale: rollVal ? [1, 1.08, 1] : [1, 1.02, 1],
       }
 
   return (
@@ -39,8 +42,8 @@ function AnimatedDice() {
       type="button"
       onClick={() => {
         const n = Math.floor(Math.random() * 20) + 1
-        setRoll(n)
-        if (!prefersReducedMotion) setTimeout(() => setRoll(null), 1000)
+        setRollVal(n)
+        if (!prefersReducedMotion) setTimeout(() => setRollVal(null), 1000)
       }}
       aria-label="Rolar d20"
       initial={{ rotate: -10, y: 0, scale: 1 }}
@@ -49,16 +52,16 @@ function AnimatedDice() {
         prefersReducedMotion
           ? { duration: 0 }
           : {
-              repeat: roll ? 0 : Infinity,
+              repeat: rollVal ? 0 : Infinity,
               repeatType: "mirror",
-              duration: roll ? 0.6 : 3,
+              duration: rollVal ? 0.6 : 3,
               ease: "easeInOut",
             }
       }
       className="bg-primary/10 ring-primary/20 focus-visible:ring-primary/60 focus-visible:ring-offset-background inline-flex h-9 w-9 items-center justify-center rounded-md ring-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     >
-      {roll ? (
-        <span className="text-primary text-sm font-semibold">{roll}</span>
+      {rollVal ? (
+        <span className="text-primary text-sm font-semibold">{rollVal}</span>
       ) : (
         <Dice6 className="text-primary h-5 w-5" />
       )}
@@ -83,6 +86,8 @@ function Stat({ value, suffix = "" }: { value: number; suffix?: string }) {
 
 function CommandMenu() {
   const [open, setOpen] = useState(false)
+  const router = useRouter()
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -93,43 +98,140 @@ function CommandMenu() {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [])
+
+  const doRoll = (expr: string) => {
+    const { total, detail } = roll(expr)
+    toast.success(`Rolagem: ${total}`, { description: detail })
+    window.dispatchEvent(
+      new CustomEvent("demo-roll", { detail: { label: `Rolar ${expr}`, total, detail } }),
+    )
+    setOpen(false)
+  }
+
+  const openDemo = () => {
+    window.dispatchEvent(new CustomEvent("open-demo"))
+    setOpen(false)
+  }
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Busque ações ou digite um comando..." />
+      <CommandInput autoFocus placeholder="Busque ações ou digite um comando..." />
       <CommandList>
         <CommandEmpty>Nada encontrado</CommandEmpty>
         <CommandGroup heading="Ações">
           <CommandItem
             onSelect={() => {
-              /* TODO: criar mesa */
+              router.push("/tables/new")
+              setOpen(false)
             }}
           >
             Criar mesa
           </CommandItem>
           <CommandItem
             onSelect={() => {
-              /* TODO: enviar convite */
+              router.push("/invites/new")
+              setOpen(false)
             }}
           >
             Enviar convite
           </CommandItem>
-          <CommandItem
-            onSelect={() => {
-              /* TODO: abrir demo */
-            }}
-          >
-            Abrir demo
-          </CommandItem>
-          <CommandItem
-            onSelect={() => {
-              /* TODO: rolar 1d20 */
-            }}
-          >
-            Rolar 1d20
-          </CommandItem>
+          <CommandItem onSelect={openDemo}>Abrir demo</CommandItem>
+          <CommandItem onSelect={() => doRoll("1d20")}>Rolar 1d20</CommandItem>
         </CommandGroup>
       </CommandList>
     </CommandDialog>
+  )
+}
+
+function DemoDialogController() {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const onOpen = () => setOpen(true)
+    window.addEventListener("open-demo", onOpen)
+    return () => window.removeEventListener("open-demo", onOpen)
+  }, [])
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Mesa demo — rolar agora</DialogTitle>
+        </DialogHeader>
+        <div className="mt-2 grid gap-3">
+          {["Ataque 2d20kh1+5", "Dano 1d12+3", "Iniciativa 1d20+2"].map((l) => (
+            <DemoRollRow key={l} label={l} />
+          ))}
+          <p className="text-muted-foreground text-xs">Sem cadastro. Resultados de demonstração.</p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DemoRollRow({ label }: { label: string }) {
+  const expr = label.split(" ").slice(-1)[0]
+  return (
+    <div className="flex items-center justify-between">
+      <p className="text-sm">{label}</p>
+      <Button
+        size="sm"
+        variant="outline"
+        className="focus-visible:ring-primary/60 focus-visible:ring-2 focus-visible:ring-offset-2"
+        onClick={() => {
+          const { total, detail } = roll(expr)
+          toast.success(`${label}: ${total}`, { description: detail })
+          window.dispatchEvent(new CustomEvent("demo-roll", { detail: { label, total, detail } }))
+        }}
+      >
+        Rolar
+      </Button>
+    </div>
+  )
+}
+
+// Normaliza uma chave estável sem o número final (evita duplicados)
+function makeKey(label: string) {
+  return label
+    .replace(/\s*\d+$/, "")
+    .trim()
+    .toLowerCase()
+}
+
+function PreviewLog() {
+  const [items, setItems] = useState<Array<{ key: string; label: string; total: number }>>([
+    { key: makeKey("Ataque 2d20kh1+5"), label: "Ataque 2d20kh1+5", total: 23 },
+    { key: makeKey("Dano 1d12+3"), label: "Dano 1d12+3", total: 11 },
+    { key: makeKey("Iniciativa 1d20+2"), label: "Iniciativa 1d20+2", total: 14 },
+  ])
+  const seen = useRef<Set<string>>(new Set(items.map((i) => i.key)))
+
+  useEffect(() => {
+    const onRoll = (e: Event) => {
+      const ev = e as CustomEvent<{ label: string; total: number }>
+      const k = makeKey(ev.detail.label)
+      if (seen.current.has(k)) return
+      seen.current.add(k)
+      setItems((prev) =>
+        [{ key: k, label: ev.detail.label, total: ev.detail.total }, ...prev].slice(0, 6),
+      )
+    }
+    window.addEventListener("demo-roll", onRoll as EventListener)
+    return () => window.removeEventListener("demo-roll", onRoll as EventListener)
+  }, [])
+
+  return (
+    <div className="bg-muted/40 rounded-md p-3">
+      <p className="text-xs font-medium">Log de rolagens</p>
+      <ul className="divide-border/60 mt-2 divide-y text-sm">
+        {items.map((it) => (
+          <li key={it.key} className="flex items-center justify-between py-1.5">
+            <span className="text-muted-foreground">{it.label}</span>
+            <span className="text-foreground font-medium">{it.total}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -139,6 +241,7 @@ export default function HomePage() {
   return (
     <main className="bg-background min-h-[100dvh]">
       <CommandMenu />
+      <DemoDialogController />
       <section className="relative overflow-hidden">
         {/* Textura e vinhetas */}
         <div aria-hidden className="pointer-events-none absolute inset-0">
@@ -189,39 +292,18 @@ export default function HomePage() {
                   <Link href="/roadmap">Ver roadmap</Link>
                 </Button>
 
-                {/* Modal de demo */}
+                {/* Gatilho manual para demo */}
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button
                       size="lg"
                       variant="ghost"
                       className="focus-visible:ring-primary/60 focus-visible:ring-2 focus-visible:ring-offset-2"
+                      onClick={() => window.dispatchEvent(new CustomEvent("open-demo"))}
                     >
                       Mesa demo
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-xl">
-                    <DialogHeader>
-                      <DialogTitle>Mesa demo — rolar agora</DialogTitle>
-                    </DialogHeader>
-                    <div className="mt-2 grid gap-3">
-                      {["Ataque 2d20kh1+5", "Dano 1d12+3", "Iniciativa 1d20+2"].map((l) => (
-                        <div key={l} className="flex items-center justify-between">
-                          <p className="text-sm">{l}</p>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="focus-visible:ring-primary/60 focus-visible:ring-2 focus-visible:ring-offset-2"
-                          >
-                            Rolar
-                          </Button>
-                        </div>
-                      ))}
-                      <p className="text-muted-foreground text-xs">
-                        Sem cadastro. Resultados de demonstração.
-                      </p>
-                    </div>
-                  </DialogContent>
                 </Dialog>
               </div>
 
@@ -307,21 +389,7 @@ export default function HomePage() {
                       ))}
                     </div>
 
-                    <div className="bg-muted/40 rounded-md p-3">
-                      <p className="text-xs font-medium">Log de rolagens</p>
-                      <ul className="divide-border/60 mt-2 divide-y text-sm">
-                        {[
-                          ["Ataque 2d20kh1+5", "23"],
-                          ["Dano 1d12+3", "11"],
-                          ["Iniciativa 1d20+2", "14"],
-                        ].map(([l, r]) => (
-                          <li key={l} className="flex items-center justify-between py-1.5">
-                            <span className="text-muted-foreground">{l}</span>
-                            <span className="text-foreground font-medium">{r}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    <PreviewLog />
 
                     <div className="text-muted-foreground flex items-center justify-between text-xs">
                       <span>Mesa: Ruínas de Âmbar</span>

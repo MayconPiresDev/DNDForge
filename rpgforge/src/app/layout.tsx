@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 
@@ -15,13 +15,17 @@ const geistMono = Geist_Mono({
   display: "swap",
 })
 
-export const metadata: Metadata = {
-  title: "RPG de Mesa",
-  description: "Crie personagens, mesas e rolagens com fluidez — como uma campanha bem narrada.",
-  metadataBase: new URL("https://example.com"),
-  applicationName: "RPG de Mesa",
+// Mover themeColor para viewport (evita o aviso do Next)
+export const viewport: Viewport = {
   themeColor: "#b45309",
-  manifest: "/manifest.json",
+}
+
+// Metadata sem themeColor; usar novo nome do app
+export const metadata: Metadata = {
+  title: "AMBAR RPG",
+  description: "Crie personagens, mesas e rolagens com fluidez — como uma campanha bem narrada.",
+  applicationName: "AMBAR RPG",
+  // O manifest será servido por app/manifest.(json|ts); não precisa apontar aqui, mas pode deixar se quiser
   icons: [
     { rel: "icon", url: "/favicon.ico" },
     { rel: "apple-touch-icon", url: "/icons/icon-192.png" },

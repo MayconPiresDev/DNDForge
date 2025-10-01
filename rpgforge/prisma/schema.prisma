@@ -1,8 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -12,4 +8,231 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+/**
+ * Enums
+ */
+enum Role {
+  DM
+  PLAYER
+}
+
+enum Visibility {
+  private
+  unlisted
+  public
+}
+
+enum InviteStatus {
+  PENDING
+  USED
+  EXPIRED
+  REVOKED
+}
+
+enum CharacterStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+/**
+ * Usuários e autenticação
+ */
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  password       Password?
+  members        TableMember[]
+  characters     Character[]
+  invitesCreated Invite[]      @relation("InvitesCreated")
+  Table          Table[]
+  Invite         Invite[]
+  SessionLog     SessionLog[]
+}
+
+model Password {
+  userId    String   @unique
+  hash      String // bcrypt/argon2
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/**
+ * NextAuth models
+ */
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/**
+ * Mesas e participação
+ */
+model Table {
+  id          String        @id @default(cuid())
+  title       String
+  system      String
+  description String?
+  visibility  Visibility    @default(private)
+  slots       Int           @default(5)
+  scheduledAt DateTime?
+  ownerId     String
+  owner       User          @relation(fields: [ownerId], references: [id])
+  members     TableMember[]
+  invites     Invite[]
+  sessions    GameSession[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  Character   Character[]
+
+  @@index([ownerId])
+}
+
+model TableMember {
+  id       String   @id @default(cuid())
+  role     Role
+  userId   String
+  tableId  String
+  joinedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  table Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tableId]) // Um membro por mesa
+  @@index([tableId])
+}
+
+/**
+ * Convites
+ */
+model Invite {
+  id        String       @id @default(cuid())
+  token     String       @unique
+  tableId   String
+  role      Role
+  createdBy String
+  status    InviteStatus @default(PENDING)
+  expiresAt DateTime?
+  usedById  String?
+  usedAt    DateTime?
+  createdAt DateTime     @default(now())
+
+  table   Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  creator User  @relation("InvitesCreated", fields: [createdBy], references: [id])
+  usedBy  User? @relation(fields: [usedById], references: [id])
+
+  @@index([tableId])
+  @@index([createdBy])
+}
+
+/**
+ * Fichas de personagem
+ */
+model Character {
+  id           String          @id @default(cuid())
+  name         String
+  class        String
+  level        Int             @default(1)
+  race         String?
+  background   String?
+  alignment    String?
+  maxHP        Int             @default(10)
+  currentHP    Int             @default(10)
+  ac           Int             @default(10)
+  speed        Int             @default(30)
+  str          Int             @default(10)
+  dex          Int             @default(10)
+  con          Int             @default(10)
+  intelligence Int             @default(10)
+  wis          Int             @default(10)
+  cha          Int             @default(10)
+  proficiency  Int             @default(2)
+  status       CharacterStatus @default(ACTIVE)
+
+  userId    String
+  tableId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  table Table? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  skills    Json?
+  inventory Json?
+  spells    Json?
+
+  @@index([userId])
+  @@index([tableId])
+}
+
+/**
+ * Sessões e logs
+ */
+model GameSession {
+  id        String    @id @default(cuid())
+  tableId   String
+  title     String?
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  table Table        @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  logs  SessionLog[]
+
+  @@index([tableId])
+}
+
+model SessionLog {
+  id            String   @id @default(cuid())
+  gameSessionId String
+  type          String // "NOTE" | "ROLL" | "EVENT"
+  content       String?
+  payload       Json?
+  createdAt     DateTime @default(now())
+  createdById   String?
+
+  gameSession GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+  createdBy   User?       @relation(fields: [createdById], references: [id])
+
+  @@index([gameSessionId])
 }

@@ -25,6 +25,7 @@ import { ArrowRight, Dice6, CalendarDays, Users, Shield, Swords } from "lucide-r
 import { motion, animate, useMotionValue, useTransform, useReducedMotion } from "framer-motion"
 import { roll } from "@/lib/roll"
 import { toast } from "sonner"
+import { startNow, viewRoadmap } from "@/app/(actions)/start-actions"
 
 function AnimatedDice() {
   const prefersReducedMotion = useReducedMotion()
@@ -190,7 +191,6 @@ function DemoRollRow({ label }: { label: string }) {
   )
 }
 
-// Normaliza uma chave estável sem o número final (evita duplicados)
 function makeKey(label: string) {
   return label
     .replace(/\s*\d+$/, "")
@@ -243,23 +243,19 @@ export default function HomePage() {
       <CommandMenu />
       <DemoDialogController />
       <section className="relative overflow-hidden">
-        {/* Textura e vinhetas */}
         <div aria-hidden className="pointer-events-none absolute inset-0">
           <div className="absolute inset-0 bg-[url('/textures/parchment-noise.png')] bg-repeat opacity-[0.08] [image-rendering:pixelated] dark:opacity-[0.12]" />
           <div className="absolute inset-0 bg-[radial-gradient(1000px_420px_at_70%_20%,rgba(124,58,18,0.20),transparent_60%)] opacity-30 dark:opacity-35" />
         </div>
 
         <div className="mx-auto max-w-screen-2xl px-6 py-12 lg:py-18">
-          {/* GRID PRINCIPAL 12 COLS */}
           <div className="grid grid-cols-12 gap-8 lg:gap-10">
-            {/* Coluna de texto (7/12) */}
             <div className="col-span-12 lg:col-span-7">
               <span className="text-muted-foreground bg-muted/40 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs tracking-wide uppercase backdrop-blur-sm">
                 <AnimatedDice />
                 Plataforma para RPG de mesa
               </span>
 
-              {/* Título com microgradiente */}
               <h1 className="mt-4 max-w-[28ch] text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">
                 <span className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-400 bg-clip-text text-transparent">
                   Crie personagens, mesas e rolagens
@@ -272,27 +268,30 @@ export default function HomePage() {
                 sessões, chat e rolagens inteligentes — tudo no navegador.
               </p>
 
-              {/* CTAs */}
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Button
-                  asChild
-                  size="lg"
-                  className="focus-visible:ring-primary/60 focus-visible:ring-2 focus-visible:ring-offset-2"
-                >
-                  <Link href="/signup" className="flex items-center gap-2">
+                {/* Começar agora: usa Server Action exportada */}
+                <form action={startNow}>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="focus-visible:ring-primary/60 flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-offset-2"
+                  >
                     Começar agora <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  size="lg"
-                  variant="outline"
-                  className="focus-visible:ring-primary/60 focus-visible:ring-2 focus-visible:ring-offset-2"
-                >
-                  <Link href="/roadmap">Ver roadmap</Link>
-                </Button>
+                  </Button>
+                </form>
 
-                {/* Gatilho manual para demo */}
+                {/* Ver roadmap: pode manter Link, ou usar a action para exigir sessão */}
+                <form action={viewRoadmap}>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    variant="outline"
+                    className="focus-visible:ring-primary/60 focus-visible:ring-2 focus-visible:ring-offset-2"
+                  >
+                    Ver roadmap
+                  </Button>
+                </form>
+
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button
@@ -307,7 +306,6 @@ export default function HomePage() {
                 </Dialog>
               </div>
 
-              {/* Prova social com counters animados */}
               <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <Swords className="text-primary h-4 w-4" />
@@ -323,7 +321,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Features alinhadas */}
               <ul className="text-muted-foreground mt-6 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
                 <li className="flex items-center gap-2">
                   <Swords className="text-primary h-4 w-4" /> Rolagens avançadas
@@ -337,7 +334,6 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* Coluna de preview (5/12) */}
             <div className="col-span-12 lg:col-span-5">
               <CardContent className="p-0">
                 <div className="relative h-full min-h-[280px]">
@@ -402,7 +398,6 @@ export default function HomePage() {
               </CardContent>
             </div>
 
-            {/* LINHA DE CARDS */}
             <motion.div
               initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
               whileInView={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
@@ -448,7 +443,6 @@ export default function HomePage() {
               ))}
             </motion.div>
 
-            {/* GÊNEROS DE RPG */}
             <div className="col-span-12">
               <h2 className="mt-2 text-2xl font-semibold tracking-tight">Gêneros de RPG</h2>
               <p className="text-muted-foreground text-sm">
@@ -501,7 +495,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* SEÇÃO FINAL: 8/4 */}
             <div className="col-span-12 grid grid-cols-12 gap-8">
               <div className="col-span-12 lg:col-span-8">
                 <Tabs defaultValue="pilares" className="w-full">
